@@ -242,7 +242,8 @@ getmobForestObject.LM <- function(object, mainModel, partitionVars, data, newTes
 		newdata.obs <- ModelEnvFormula(as.formula(paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | ")), data = newdata)@get("response")		
 		newdata.R2 = unlist(lapply(1:B, function(x) pp.out[[x]]$newdat.R2))
 		newdatRes = newdata.obs[,1] - apply(newdata.predictions, 1, mean, na.rm=T)
-		newdataPred <- prediction_output(apply(newdata.predictions, 1, mean, na.rm=T), apply(newdata.predictions, 1, sd, na.rm=T), newdatRes, newdata.R2, numeric(), computeR2(newdata.obs, newdata.predictions), "Newdata")
+		#newdataPred <- prediction_output(apply(newdata.predictions, 1, mean, na.rm=T), apply(newdata.predictions, 1, sd, na.rm=T), newdatRes, newdata.R2, numeric(), computeR2(newdata.obs, newdata.predictions), "Newdata")
+		newdataPred <- prediction_output(apply(newdata.predictions, 1, function(x) sum(oob.R2*x, na.rm=T)/sum(oob.R2, na.rm=T)), newdatRes, newdata.R2, numeric(), computeR2(newdata.obs, newdata.predictions), "Newdata")		
 	}
 	varImpObj <- varimp_output(varImpMatrix)
 	mfout <- mobForest_output(oobPred, generalPred, newdataPred, varImpObj, paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | "), fam = "", train.response = obs.outcome, new.response = newdata.obs)
@@ -328,7 +329,7 @@ stringFormula <- function(formula)
 
 mobForestAnalysis <- function(formula, partitionVariables, data, mobForest.controls = mobForest_control(), newTestData = as.data.frame(matrix(0,0,0)), processors = 1, model = linearModel, family = NULL)
 {
-	library(party)
+	#library(party)
 	mod <- stringFormula(formula)
 	partitionVars = partitionVariables
 	B = mobForest.controls@ntree
@@ -336,11 +337,8 @@ mobForestAnalysis <- function(formula, partitionVariables, data, mobForest.contr
 	if(mtry == 0) mtry = round(length(partitionVars)/3)	
 	fraction = mobForest.controls@fraction
 	if (mobForest.controls@replace == TRUE) fraction = 1		
-	#library(snow)
-	library(parallel)
-	#cl <- makeCluster(processors , type = "SOCK")
+	#library(parallel)
 	cl <- makeCluster(getOption("cl.cores", processors))
-	#clusterSetupRNGstream(cl , seed=rep(round(2^32 * runif(1)),6))
 	clusterEvalQ(cl, library(party))
 	clusterExport(cl, c("mob_RF_Tree", "treePredictions", "computeR2", "computeAcc"))
 	pp.out <- clusterApply(cl, 1:B, bootstrap, data = data, mainModel = mod, partitionVars = partitionVars, mtry = mtry, newTestData = newTestData, mob.controls = mobForest.controls@mob.control, fraction = fraction, replace = mobForest.controls@replace, model = model, family = family)

@@ -20,17 +20,18 @@ Additional arguments to print method
 }
 }
 \examples{
+\donttest{
 data("BostonHousing", package = "mlbench")
 
-rfout <- mobForestAnalysis(as.formula(medv ~ lstat + rm), c("zn", "indus", "chas", "nox", 
-"age", "dis", "rad", "tax", "crim", "b", "ptratio"), mobForest.controls = 
-mobForest_control(ntree = 8, mtry = 4, replace = TRUE, fraction = 0.632, minsplit = 80),
-data = BostonHousing, 
-processors = 1,
-model = linearModel)
+rfout <- mobForestAnalysis(as.formula(medv ~ lstat), 
+c("rad", "tax", "crim"),
+mobForest.controls = 
+mobForest_control(ntree = 3, mtry = 2, replace = TRUE, 
+fraction = 0.632, minsplit = 120), data = BostonHousing, 
+processors = 1, model = linearModel)
 
 ## prints predictive accuracy output 
 pacc <- PredictiveAccuracy(rfout)
 pacc
-
+}
 }

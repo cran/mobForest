@@ -33,6 +33,7 @@ Strobl, C., Malley, J. and Tutz, G. (2009) An introduction to recursive partitio
 }
 \keyword{ package }
 \examples{
+\donttest{
 set.seed(290875)
 if(require("mlbench")) {
 ## Random Forest analysis of model based recursive partitioning
@@ -40,16 +41,16 @@ if(require("mlbench")) {
 ## load data  
 data("BostonHousing", package = "mlbench")
 
-## Recursive partitioning based on linear regression model medv ~ lstat + rm with 8 trees. 
+## Recursive partitioning based on linear regression model medv ~ lstat with 3 trees. 
 ## 1 core/processor used. Supply more processors using 'processors' argument
-rfout <- mobForestAnalysis(as.formula(medv ~ lstat + rm), c("zn", "indus", "chas", "nox", 
-"age", "dis", "rad", "tax", "crim", "b", "ptratio"), mobForest.controls = 
-mobForest_control(ntree = 8, mtry = 4, replace = TRUE, fraction = 0.632, minsplit = 80),
-data = BostonHousing, 
-processors = 1,
-model = linearModel)
+rfout <- mobForestAnalysis(as.formula(medv ~ lstat), 
+c("rad", "tax", "crim"),
+mobForest.controls = 
+mobForest_control(ntree = 3, mtry = 2, replace = TRUE, 
+fraction = 0.632, minsplit = 120), data = BostonHousing, 
+processors = 1, model = linearModel)
 
-rfout		## should produce descriptive output for mobForestOutput object
-
+ rfout		## should produce descriptive output for mobForestOutput object
+}
 }
 }

@@ -109,18 +109,21 @@ setMethod("PredictiveAccuracy", signature(object="mobForestOutput", newdata="ANY
 	rf <- object
 	rval <- list()
 	vecR2 = NULL
+	vecMSE = NULL
 	if(newdata == FALSE)
 	{		
 		ss = nrow((rf@GeneralPredictions)@predMat)
-		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss, rfout@modelUsed, rf@fam)
+		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss, rf@modelUsed, rf@fam)
 		names(rval) <- c("oob.R2", "oob.mse", "oob.OverallR2", "oob.OverallMSE", "General.R2", "General.mse", "General.OverallR2", "General.OverallMSE", "modelUsed", "fam")
-		vecR2 = c(rval$oob.OverallR2, rval$General.OverallR2)
+		vecR2 = c(rval$oob.OverallR2, min(rval$oob.R2), max(rval$oob.R2))
+		vecMSE = c(rval$oob.OverallMSE, min(rval$oob.mse), max(rval$oob.mse))
 	} else {		
 		ss1 = nrow((rf@GeneralPredictions)@predMat)
 		ss2 = nrow((rf@NewDataPredictions)@predMat)
-		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss1, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss1, rfout@modelUsed, rf@fam, (rf@NewDataPredictions)@R2, (rf@NewDataPredictions)@overallR2, sum((rf@NewDataPredictions)@predMat[,3]**2, na.rm=T)/ss2)
+		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss1, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss1, rf@modelUsed, rf@fam, (rf@NewDataPredictions)@R2, (rf@NewDataPredictions)@overallR2, sum((rf@NewDataPredictions)@predMat[,3]**2, na.rm=T)/ss2)
 		names(rval) <- c("oob.R2", "oob.mse", "oob.OverallR2", "oob.OverallMSE", "General.R2", "General.mse", "General.OverallR2", "General.OverallMSE", "modelUsed", "fam", "Newdata.R2", "Newdata.OverallR2", "Newdata.OverallMSE")
-		vecR2 = c(rval$oob.OverallR2, rval$General.OverallR2, rval$Newdata.OverallR2)
+		vecR2 = c(rval$oob.OverallR2, min(rval$oob.R2), max(rval$oob.R2), rval$Newdata.OverallR2)
+		vecMSE = c(rval$oob.OverallMSE, min(rval$oob.mse), max(rval$oob.mse), rval$Newdata.OverallMSE)
 	}
 	
 	newd = which(regexpr("Newdata", names(rval)) > 0)
@@ -148,29 +151,36 @@ setMethod("PredictiveAccuracy", signature(object="mobForestOutput", newdata="ANY
 			xlab = expression(R**2)
 		}		
 		
-		xlim1 = ifelse(min(vecR2) < 0, min(vecR2) - 0.1, 0)
-		xlim2 = max(vecR2) + (max(vecR2) - xlim1)/5		
+		xlim1 = ifelse(min(vecR2) < 0, 0, min(vecR2))
+		#xlim2 = max(vecR2) + (max(vecR2) - xlim1)/5		
+		xlim2 = ifelse(max(vecR2) > 1, 1, max(vecR2))
 		if(length(newd) == 0) par(mfrow = c(r,2))
 		if(length(newd) > 0) par(mfrow = c((r + 1),2))		
-		hist(rval$oob.R2, main="OOB performance (Tree Level)", xlab=xlab)
+		hist(rval$oob.R2, main="OOB performance (Tree Level)", xlab=xlab, xlim=c(xlim1, xlim2))
+		box()
 		plot(c(rval$oob.OverallR2, rval$oob.OverallR2), c(1,2), axes=F, type="l", col="red", lwd=2, main = "OOB performance (Forest Level)", xlab=xlab, ylab="", xlim=c(xlim1, xlim2))
 		axis(1)		
+		box()
 		if(rf@fam != "binomial") 
 		{
-			hist(rval$oob.mse, xlab="MSE", main = "OOB performance (Tree Level)")
-			plot(c(rval$oob.OverallMSE, rval$oob.OverallMSE), c(1,2), axes=F, type="l", col="red", lwd=2, xlab="MSE", ylab="", main = "OOB performance (Forest Level)")
+			hist(rval$oob.mse, xlab="MSE", main = "OOB performance (Tree Level)", xlim=c(min(vecMSE), max(vecMSE)))
+			box()
+			plot(c(rval$oob.OverallMSE, rval$oob.OverallMSE), c(1,2), axes=F, type="l", col="red", lwd=2, xlab="MSE", ylab="", main = "OOB performance (Forest Level)", xlim=c(min(vecMSE), max(vecMSE)))
 			axis(1)			
-		}		
+			box()
+		}
 		if(length(newd) > 0)
 		{
 			if(length(rval$Newdata.OverallR2) != 0) 
 			{
-				plot(c(rval$Newdata.OverallR2,rval$Newdata.OverallR2), c(1,2), axes=F, type="l", col="red", lwd=2, xlab=xlab, ylab="", xlim=c(xlim1, xlim2), main="Validation Performance")			
-				axis(1)			
+				plot(c(rval$Newdata.OverallR2,rval$Newdata.OverallR2), c(1,2), axes=F, type="l", col="red", lwd=2, xlab=xlab, ylab="", xlim=c(xlim1, xlim2), main="Validation Performance")
+				axis(1)
+				box()
 				if(rf@fam != "binomial")
 				{
-					plot(c(rval$Newdata.OverallMSE,rval$Newdata.OverallMSE), c(1,2), axes=F, type="l", col="red", lwd=2, xlab="MSE", ylab="", main="Validation Performance")
-					axis(1)							
+					plot(c(rval$Newdata.OverallMSE,rval$Newdata.OverallMSE), c(1,2), axes=F, type="l", col="red", lwd=2, xlab="MSE", ylab="", main="Validation Performance", xlim=c(min(vecMSE), max(vecMSE)))
+					axis(1)
+					box()
 				}
 			} else {
 				cat("No Performance Plot for new test data because 'newTestData' argument was not supplied to mobForestAnalysis() function \n")

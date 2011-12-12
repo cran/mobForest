@@ -48,38 +48,25 @@ Objects can be created by \code{\link{mobForest_output}}.
 \code{\linkS4class{predictionOutput}},  \code{\linkS4class{varimpOutput}}
 }
 \examples{
+\donttest{
 if(require("mlbench")) {
 
 ## Random Forest analysis of model based recursive partitioning
 ## load data  
 data("BostonHousing", package = "mlbench")
 
-## Recursive partitioning based on linear regression model medv ~ lstat + rm with 8 trees. 
+## Recursive partitioning based on linear regression model medv ~ lstat with 3 trees. 
 ## 1 core/processor used. Supply more processors using 'processors' argument
-rfout <- mobForestAnalysis(as.formula(medv ~ lstat + rm), c("zn", "indus", "chas", "nox", 
-"age", "dis", "rad", "tax", "crim", "b", "ptratio"), mobForest.controls = 
-mobForest_control(ntree = 8, mtry = 4, replace = TRUE, fraction = 0.632, minsplit = 80),
-data = BostonHousing, 
-processors = 1,
-model = linearModel)
+rfout <- mobForestAnalysis(as.formula(medv ~ lstat), 
+c("rad", "tax", "crim"),
+mobForest.controls = 
+mobForest_control(ntree = 3, mtry = 2, replace = TRUE, 
+fraction = 0.632, minsplit = 120), data = BostonHousing, 
+processors = 1, model = linearModel)
 
 ## print method for mobForestOutput object
 show(rfout)
-
-## get predicted outcome values for out-of-bag cases summarized across trees
-predVals <- getPredictedValues(rfout, OOB = TRUE)
-
-## get predictive performance estimates and produce a performance plot 
-PredictiveAccuracy(rfout)
-
-## Returns a vector of variable importance scores 
-getVarimp(rfout)
-
-## produce a variable importance plot
-varimplot(rfout)
-
-## Produces residual plot
-residualPlot(rfout)
+}
 }
 }
 \keyword{classes}

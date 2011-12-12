@@ -24,16 +24,17 @@ An object of class 'mobForestOutput'
 
 ## load data  
 data("BostonHousing", package = "mlbench")
-
-## Recursive partitioning based on linear regression model medv ~ lstat + rm with 8 trees. 
+\donttest{
+## Recursive partitioning based on linear regression model medv ~ lstat with 3 trees. 
 ## 1 core/processor used. Supply more processors using 'processors' argument
-rfout <- mobForestAnalysis(as.formula(medv ~ lstat + rm), c("zn", "indus", "chas", "nox", 
-"age", "dis", "rad", "tax", "crim", "b", "ptratio"), mobForest.controls = 
-mobForest_control(ntree = 8, mtry = 4, replace = TRUE, fraction = 0.632, minsplit = 80),
-data = BostonHousing, 
-processors = 1,
-model = linearModel)
+rfout <- mobForestAnalysis(as.formula(medv ~ lstat), 
+c("rad", "tax", "crim"),
+mobForest.controls = 
+mobForest_control(ntree = 3, mtry = 2, replace = TRUE, 
+fraction = 0.632, minsplit = 120), data = BostonHousing, 
+processors = 1, model = linearModel)
 
 ## Produces residual plot
 residualPlot(rfout)
+}
 }
