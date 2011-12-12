@@ -1,0 +1,46 @@
+\name{getPredictedValues}
+\alias{getPredictedValues}
+%- Also NEED an '\alias' for EACH other topic documented here.
+\title{
+Predictions
+}
+\description{
+Get predictions summarized across trees for out-of-bag cases or all cases or cases from new test data.
+}
+\usage{
+getPredictedValues(object, OOB = TRUE, newdata = FALSE)
+}
+%- maybe also 'usage' for other objects documented here.
+\arguments{
+  \item{object}{
+An object of class \code{mobForestOutput}
+}
+  \item{OOB}{
+a logical determining whether to return predictions from the out-of-bag sample or the learning sample (not suggested).
+}
+  \item{newdata}{
+a logical determining whether to return predictions from test data. If newdata = TRUE, then OOB argument is ignored.
+}
+}
+\value{
+matrix with three columns: 1) Mean Predictions across trees, 2)  Standard deviation of predcitions across trees, and 3) Residual (mean predicted - observed)
+}
+\examples{
+## Random Forest analysis of model based recursive partitioning
+
+## load data  
+data("BostonHousing", package = "mlbench")
+
+## Recursive partitioning based on linear regression model medv ~ lstat + rm with 8 trees. 
+## 1 core/processor used. Supply more processors using 'processors' argument
+rfout <- mobForestAnalysis(as.formula(medv ~ lstat + rm), c("zn", "indus", "chas", "nox", 
+"age", "dis", "rad", "tax", "crim", "b", "ptratio"), mobForest.controls = 
+mobForest_control(ntree = 8, mtry = 4, replace = TRUE, fraction = 0.632, minsplit = 80),
+data = BostonHousing, 
+processors = 1,
+model = linearModel)
+
+## Obtain out-of-bag predicted values
+OOB.predMat <- getPredictedValues(rfout, OOB = TRUE)
+OOB.pred = OOB.predMat[,1]
+}

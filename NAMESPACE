@@ -1,0 +1,17 @@
+export(mobForest_control, mobForestAnalysis, mob_RF_Tree, computeR2, computeAcc, treePredictions, bootstrap, getmobForestObject.GLM, getmobForestObject.LM, stringFormula, prediction_output, varimp_output, mobForest_output)
+exportMethods(
+    "getPredictedValues",
+    "getVarimp",
+    "PredictiveAccuracy",
+    "residualPlot",
+    "show",
+    "varimplot" 
+)
+exportClasses(
+    "mobForestControl",
+     "mobForestOutput",
+     "predictionOutput",
+     "varimpOutput" 
+)
+
+S3method(print, predAccuracyEstimates)

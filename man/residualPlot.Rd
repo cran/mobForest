@@ -1,0 +1,39 @@
+\name{residualPlot}
+\alias{residualPlot}
+%- Also NEED an '\alias' for EACH other topic documented here.
+\title{
+Residual Diagnostics
+}
+\description{
+Produces two plots: a) histogram of residuals, b) predicted Vs residuals
+}
+\usage{
+residualPlot(object)
+}
+%- maybe also 'usage' for other objects documented here.
+\arguments{
+  \item{object}{
+An object of class 'mobForestOutput'
+}
+}
+\details{
+ Residuals are computed as difference between the predicted values of outcome (summarized across all trees) and observed values of outcome. 
+}
+\examples{
+## Random Forest analysis of model based recursive partitioning
+
+## load data  
+data("BostonHousing", package = "mlbench")
+
+## Recursive partitioning based on linear regression model medv ~ lstat + rm with 8 trees. 
+## 1 core/processor used. Supply more processors using 'processors' argument
+rfout <- mobForestAnalysis(as.formula(medv ~ lstat + rm), c("zn", "indus", "chas", "nox", 
+"age", "dis", "rad", "tax", "crim", "b", "ptratio"), mobForest.controls = 
+mobForest_control(ntree = 8, mtry = 4, replace = TRUE, fraction = 0.632, minsplit = 80),
+data = BostonHousing, 
+processors = 1,
+model = linearModel)
+
+## Produces residual plot
+residualPlot(rfout)
+}
