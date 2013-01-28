@@ -2,7 +2,7 @@
 \docType{methods}
 \alias{getPredictedValues-methods}
 \alias{getPredictedValues,mobForestOutput-method}
-\title{ ~~ Methods for Function \code{getPredictedValues}  ~~}
+\title{ Get fitted values from mobForestOutput object }
 \description{
  ~~ Methods for function \code{getPredictedValues}  ~~
 }

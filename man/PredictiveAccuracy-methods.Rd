@@ -2,7 +2,7 @@
 \docType{methods}
 \alias{PredictiveAccuracy-methods}
 \alias{PredictiveAccuracy,mobForestOutput-method}
-\title{ Predictive Performance}
+\title{ Predictive Performance }
 \description{
  ~~ Methods for function \code{PredictiveAccuracy}  ~~
 }

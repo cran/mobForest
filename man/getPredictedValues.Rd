@@ -23,7 +23,7 @@ a logical determining whether to return predictions from test data. If newdata =
 }
 }
 \value{
-matrix with three columns: 1) Mean Predictions across trees, 2)  Standard deviation of predcitions across trees, and 3) Residual (mean predicted - observed)
+matrix with three columns: 1) Mean Predictions across trees, 2)  Standard deviation of predcitions across trees, and 3) Residual (mean predicted - observed). The third column is applicable only when linear regression is considered as the node model.
 }
 \examples{
 ## Random Forest analysis of model based recursive partitioning
@@ -35,11 +35,10 @@ BostonHousing <- BostonHousing[1:90,c("rad", "tax", "crim", "medv", "lstat")]
 ## Recursive partitioning based on linear regression model medv ~ lstat with 3 trees. 
 ## 1 core/processor used. Supply more processors using 'processors' argument
 rfout <- mobForestAnalysis(as.formula(medv ~ lstat), 
-c("rad", "tax", "crim"),
-mobForest.controls = 
-mobForest_control(ntree = 3, mtry = 3, replace = TRUE, 
-fraction = 0.632, minsplit = 25), data = BostonHousing, 
-processors = 1, model = linearModel)
+c("rad", "tax", "crim"), mobForest.controls = 
+mobForest_control(ntree = 3, mtry = 2, replace = TRUE, 
+alpha = 0.05, bonferroni = TRUE, minsplit = 25), 
+data = BostonHousing, processors = 1, model = linearModel)
 
 ## Obtain out-of-bag predicted values
 OOB.predMat <- getPredictedValues(rfout, OOB = TRUE)

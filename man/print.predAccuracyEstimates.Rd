@@ -24,11 +24,10 @@ Additional arguments to print method
 data("BostonHousing", package = "mlbench")
 
 rfout <- mobForestAnalysis(as.formula(medv ~ lstat), 
-c("rad", "tax", "crim"),
-mobForest.controls = 
+c("rad", "tax", "crim"), mobForest.controls = 
 mobForest_control(ntree = 3, mtry = 2, replace = TRUE, 
-fraction = 0.632, minsplit = 120), data = BostonHousing, 
-processors = 1, model = linearModel)
+alpha = 0.05, bonferroni = T, minsplit = 120), 
+data = BostonHousing, processors = 1, model = linearModel)
 
 ## prints predictive accuracy output 
 pacc <- PredictiveAccuracy(rfout)

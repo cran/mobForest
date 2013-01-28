@@ -72,7 +72,7 @@ computeR2 <- function(response, predictions)
 	return(R2)
 }
 
-computeAcc <- function(response, predictions)
+computeAcc <- function(response, predictions, prob.cutoff)
 {
 	#pred.class = rep(0, length(response[,1]))
 	#prop.1 = apply(predictions, 1, function(x) mean(x == 1))
@@ -82,10 +82,22 @@ computeAcc <- function(response, predictions)
 	pred.class = rep(0, length(response[,1]))
 	levels(response[,1]) <- list("0"=levels(response[,1])[1], "1"=levels(response[,1])[2])
 	meanPred = apply(predictions, 1, mean, na.rm=T)
-	pred.class[which(meanPred > 0.5)] = 1
+	pred.class[which(meanPred > prob.cutoff)] = 1
 	acc = mean(pred.class == response[,1])
 	return(acc)
 }
+
+computeMSE <- function(response, predictions)
+{
+  mean.predictions = apply(predictions, 1, mean, na.rm=T)
+  sse = sum((response[,1] - mean.predictions)**2, na.rm=T)
+  n = length(which(!is.na((response[,1] - colMeans(response, na.rm=T)))))
+  #ssto = sum((response[,1] - colMeans(response, na.rm=T))**2, na.rm=T)
+  #R2 = 1 - (sse/ssto)	
+  #if(R2 < 0) R2 = 0
+  return(sse/n)
+}
+
 
 treePredictions <- function(j, data, tree)
 {
@@ -115,9 +127,11 @@ treePredictions <- function(j, data, tree)
 	return(as.numeric(tr$model$predict_response(dat[j,])))	
 } 
 
-bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.controls, fraction, replace, model, family)
+bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.controls, fraction, replace, model, family, prob.cutoff)
 {		
-	data.subinds = sample(nrow(data), replace = replace)[1:round(fraction*nrow(data))]	
+	if(is.null(prob.cutoff)) prob.cutoff = 0.5
+  
+  data.subinds = sample(nrow(data), replace = replace)[1:round(fraction*nrow(data))]	
 	data.sub = data[data.subinds,]
 	fmBH = NULL
 	if(model@name == "linear regression model")
@@ -136,8 +150,10 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 		gen.rsq = computeR2(obs.outcome, matrix(pred, ncol=1))
 		mse.gen = sum((obs.outcome - pred)**2, na.rm=T)/nrow(data)
 		oob.rsq = computeR2(matrix(obs.outcome[oob.inds,], ncol=1), matrix(pred[oob.inds], ncol=1))
-		mse.oob = sum((obs.outcome[oob.inds,] - pred[oob.inds])**2, na.rm=T)/length(oob.inds)
+		#mse.oob = sum((obs.outcome[oob.inds,] - pred[oob.inds])**2, na.rm=T)/length(oob.inds)
+		mse.oob = computeMSE(matrix(obs.outcome[oob.inds,],ncol=1), matrix(pred[oob.inds], ncol=1))
 		oob.rsq.perm = rep(0, length(partitionVars))
+		oob.mse.perm = rep(0, length(partitionVars))
 		varImp = rep(0, length(partitionVars))
 		for(p in 1:length(partitionVars))
 		{		
@@ -145,7 +161,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 			oob.perm[,partitionVars[p]] = sample(oob.sub[,partitionVars[p]])
 			oob.pred.perm = sapply(1:nrow(oob.perm), treePredictions, data = oob.perm, tree = fmBH@tree)			
 			oob.rsq.perm[p] = computeR2(matrix(obs.outcome[oob.inds,],ncol=1), matrix(oob.pred.perm, ncol=1))
-			#sse.perm = sum((obs.outcome[oob.inds,] - oob.pred.perm)**2)
+			oob.mse.perm[p] = computeMSE(matrix(obs.outcome[oob.inds,],ncol=1), matrix(oob.pred.perm, ncol=1))
 			#oob.rsq.perm[p] = 1 - (sse.perm/ssto.oob)		
 		}
 		
@@ -157,7 +173,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 			obs.newdat <- ModelEnvFormula(as.formula(paste(mainModel, partitionVars, sep=" | ")), data = newTestData)@get("response")
 			newdat.rsq = computeR2(obs.newdat, matrix(pred.new, ncol=1))
 		}
-		ret <- list(oob.inds, oob.rsq, pred, (oob.rsq - oob.rsq.perm), mse.oob, gen.rsq, mse.gen, pred.new, newdat.rsq)	
+		ret <- list(oob.inds, oob.rsq, pred, (oob.mse.perm - mse.oob), mse.oob, gen.rsq, mse.gen, pred.new, newdat.rsq)	
 		names(ret) <- c("oob.inds", "oob.R2", "pred", "rawVarImp", "mse.oob", "gen.R2", "mse.gen", "pred.new", "newdat.R2")	
 	}
 	
@@ -167,7 +183,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 		{	
 			levels(obs.outcome[,1]) <- list("0"=levels(obs.outcome[,1])[1], "1"=levels(obs.outcome[,1])[2])
 			pred.class = rep(0, length(pred))
-			pred.class[which(pred > 0.5)] = 1		
+			pred.class[which(pred > prob.cutoff)] = 1		
 			gen.acc = length(which(pred.class == obs.outcome[,1]))
 			oob.acc = length(which(pred.class[oob.inds] == obs.outcome[oob.inds,1]))
 			oob.acc.perm = rep(0, length(partitionVars))
@@ -178,7 +194,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 				oob.perm[,partitionVars[p]] = sample(oob.sub[,partitionVars[p]])
 				oob.pred.perm = sapply(1:nrow(oob.perm), treePredictions, data = oob.perm, tree = fmBH@tree)
 				pred.class.perm = rep(0, length(oob.pred.perm))
-				pred.class.perm[which(oob.pred.perm > 0.5)] = 1
+				pred.class.perm[which(oob.pred.perm > prob.cutoff)] = 1
 				#oob.acc.perm[p] = computeR2(obs.outcome[oob.inds,], matrix(oob.pred.perm, ncol=1))
 				oob.acc.perm[p] = length(which(pred.class.perm == obs.outcome[oob.inds,1]))
 			}
@@ -189,7 +205,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 			{
 				pred.new = sapply(1:nrow(newTestData), treePredictions, data = newTestData, tree = fmBH@tree)
 				predNew.class = rep(0, length(pred.new))
-				predNew.class[which(pred > 0.5)] = 1
+				predNew.class[which(pred > prob.cutoff)] = 1
 				obs.newdat <- ModelEnvFormula(as.formula(paste(mainModel, partitionVars, sep=" | ")), data = newTestData)@get("response")
 				levels(obs.newdat[,1]) <- list("0"=levels(obs.newdat[,1])[1], "1"=levels(obs.newdat[,1])[2])
 				newdat.acc = length(which(predNew.class == obs.newdat[,1]))/nrow(newTestData)
@@ -242,17 +258,19 @@ getmobForestObject.LM <- function(object, mainModel, partitionVars, data, newTes
 		newdata.obs <- ModelEnvFormula(as.formula(paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | ")), data = newdata)@get("response")		
 		newdata.R2 = unlist(lapply(1:B, function(x) pp.out[[x]]$newdat.R2))
 		newdatRes = newdata.obs[,1] - apply(newdata.predictions, 1, mean, na.rm=T)
-		#newdataPred <- prediction_output(apply(newdata.predictions, 1, mean, na.rm=T), apply(newdata.predictions, 1, sd, na.rm=T), newdatRes, newdata.R2, numeric(), computeR2(newdata.obs, newdata.predictions), "Newdata")
-		newdataPred <- prediction_output(apply(newdata.predictions, 1, function(x) sum(oob.R2*x, na.rm=T)/sum(oob.R2, na.rm=T)), newdatRes, newdata.R2, numeric(), computeR2(newdata.obs, newdata.predictions), "Newdata")		
+		#newdataPred <- prediction_output(apply(newdata.predictions, 1, function(x) sum(oob.R2*x, na.rm=T)/sum(oob.R2, na.rm=T)), newdatRes, newdata.R2, numeric(), computeR2(newdata.obs, newdata.predictions), "Newdata")		
+		newdataPred <- prediction_output(predMean = apply(newdata.predictions, 1, mean, na.rm=T), predSd = apply(newdata.predictions, 1, sd, na.rm=T), residual = newdatRes, R2 = newdata.R2,  overallR2 = computeR2(newdata.obs, newdata.predictions), predType = "Newdata")  			
 	}
 	varImpObj <- varimp_output(varImpMatrix)
 	mfout <- mobForest_output(oobPred, generalPred, newdataPred, varImpObj, paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | "), fam = "", train.response = obs.outcome, new.response = newdata.obs)
 	return(mfout)
 }
 
-getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTestData, ntree, fam)
+getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTestData, ntree, fam, prob.cutoff)
 {		
-	B = ntree
+	if(is.null(prob.cutoff)) prob.cutoff = 0.5
+      
+  B = ntree
 	pp.out <- object
 	varImpMatrix = matrix(0, nrow=length(partitionVars), ncol=B)
 	rownames(varImpMatrix) = partitionVars	
@@ -290,9 +308,9 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 	#oobPred <- prediction_output(predMean = OOBpred.class, predSd = rep(NA, length(OOBpred.class)) , residual = rep(NA, length(OOBpred.class)), R2 = oob.acc, overallR2 = computeAcc(obs.outcome, oob.predictions), predType = "OOB")
 	#generalPred <- prediction_output(predMean = Gpred.class, predSd = rep(NA, length(Gpred.class)), residual = rep(NA, length(Gpred.class)), R2 = general.acc,  overallR2 = computeAcc(obs.outcome, general.predictions), predType = "General")
 	oobRes = rep(NA, nrow(obs.outcome))
-	oobPred <- prediction_output(predMean = apply(oob.predictions, 1, mean, na.rm=T), predSd = apply(oob.predictions, 1, sd, na.rm=T) , residual = oobRes, R2 = oob.acc, overallR2 = computeAcc(obs.outcome, oob.predictions), predType = "OOB")	
+	oobPred <- prediction_output(predMean = apply(oob.predictions, 1, mean, na.rm=T), predSd = apply(oob.predictions, 1, sd, na.rm=T) , residual = oobRes, R2 = oob.acc, overallR2 = computeAcc(obs.outcome, oob.predictions, prob.cutoff), predType = "OOB")	
 	genRes = rep(NA, nrow(obs.outcome))
-	generalPred <- prediction_output(predMean = apply(general.predictions, 1, mean, na.rm=T), predSd = apply(general.predictions, 1, sd, na.rm=T) , residual = genRes, R2 = general.acc, overallR2 = computeAcc(obs.outcome, general.predictions), predType = "General")
+	generalPred <- prediction_output(predMean = apply(general.predictions, 1, mean, na.rm=T), predSd = apply(general.predictions, 1, sd, na.rm=T) , residual = genRes, R2 = general.acc, overallR2 = computeAcc(obs.outcome, general.predictions, prob.cutoff), predType = "General")
 		
 	newdataPred = prediction_output()
 	newdata = newTestData
@@ -311,7 +329,7 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 		
 		#newdataPred <- prediction_output(predMean = NewDatapred.class, predSd = rep(NA, length(NewDatapred.class)), residual = (1 - apply(newdata.predictions,1, mean, na.rm=T)), R2 = newdata.acc,  overallR2 = computeAcc(newdata.obs, newdata.predictions), predType = "Newdata")
 		newdatRes = rep(NA, nrow(newdata.obs))
-		newdataPred <- prediction_output(predMean = apply(newdata.predictions, 1, mean, na.rm=T), predSd = apply(newdata.predictions, 1, sd, na.rm=T), residual = newdatRes, R2 = newdata.acc,  overallR2 = computeAcc(newdata.obs, newdata.predictions), predType = "Newdata")		
+		newdataPred <- prediction_output(predMean = apply(newdata.predictions, 1, mean, na.rm=T), predSd = apply(newdata.predictions, 1, sd, na.rm=T), residual = newdatRes, R2 = newdata.acc,  overallR2 = computeAcc(newdata.obs, newdata.predictions,prob.cutoff), predType = "Newdata")		
 	}
 	varImpObj <- varimp_output(varImpMatrix)
 	mfout <- mobForest_output(oobPred, generalPred, newdataPred, varImpObj, paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | "), fam = fam, train.response = obs.outcome, new.response = newdata.obs)
@@ -327,7 +345,7 @@ stringFormula <- function(formula)
 	return(mod)
 }
 
-mobForestAnalysis <- function(formula, partitionVariables, data, mobForest.controls = mobForest_control(), newTestData = as.data.frame(matrix(0,0,0)), processors = 1, model = linearModel, family = NULL)
+mobForestAnalysis <- function(formula, partitionVariables, data, mobForest.controls = mobForest_control(), newTestData = as.data.frame(matrix(0,0,0)), processors = 1, model = linearModel, family = NULL, prob.cutoff = NULL)
 {
 	#library(party)
 	mod <- stringFormula(formula)
@@ -340,14 +358,14 @@ mobForestAnalysis <- function(formula, partitionVariables, data, mobForest.contr
 	#library(parallel)
 	cl <- makeCluster(getOption("cl.cores", processors))
 	clusterEvalQ(cl, library(party))
-	clusterExport(cl, c("mob_RF_Tree", "treePredictions", "computeR2", "computeAcc"))
-	pp.out <- clusterApply(cl, 1:B, bootstrap, data = data, mainModel = mod, partitionVars = partitionVars, mtry = mtry, newTestData = newTestData, mob.controls = mobForest.controls@mob.control, fraction = fraction, replace = mobForest.controls@replace, model = model, family = family)
+	clusterExport(cl, c("mob_RF_Tree", "treePredictions", "computeR2", "computeAcc", "computeMSE"))
+	pp.out <- clusterApply(cl, 1:B, bootstrap, data = data, mainModel = mod, partitionVars = partitionVars, mtry = mtry, newTestData = newTestData, mob.controls = mobForest.controls@mob.control, fraction = fraction, replace = mobForest.controls@replace, model = model, family = family, prob.cutoff = prob.cutoff)
 	stopCluster(cl)
 	obs.outcome <- ModelEnvFormula(as.formula(paste(mod, partitionVars, sep=" | ")), data = data)@get("response")
 	mfObj = NULL
 	if (model@name == "generalized linear regression model") {
 		if (family$family == "binomial") {
-			mfObj <- getmobForestObject.GLM(pp.out, mainModel = mod, partitionVars = partitionVars, data = data, newTestData = newTestData, ntree = B, fam = "binomial")
+			mfObj <- getmobForestObject.GLM(pp.out, mainModel = mod, partitionVars = partitionVars, data = data, newTestData = newTestData, ntree = B, fam = "binomial", prob.cutoff = prob.cutoff)
 		}
 		if (family$family == "poisson") {
 			mfObj <- getmobForestObject.LM(pp.out, mainModel = mod, partitionVars = partitionVars, data = data, newTestData = newTestData, ntree = B, fam = "poisson")

@@ -4,13 +4,22 @@
 ### Version 4 was made because parseFormula() had a bug that needed to be rectified. 
 ### Version 5 for adding the generalized linear model functionality
 
-setClass("mobForestControl", representation(ntree = "numeric", mtry = "numeric", replace = "logical", fraction="numeric", mob.control = "list"), prototype = list(ntree = 300, mtry = 0, replace = TRUE, fraction = 0.632))
-mobForest_control <- function(ntree = 300, mtry = 0, replace = TRUE, fraction = 0.632, alpha = 0.05, bonferroni = TRUE, minsplit = 20, trim = 0.1, objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE)
+# setClass("mobTreeControl", representation(mob.control = "list"), prototype = list(alpha = 0.05, bonferroni = TRUE, minsplit = 20, trim = 0.1, objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE))
+# mobTree_control <- function(alpha = 0.05, bonferroni = TRUE, minsplit = 20, trim = 0.1, objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE)
+# {
+#   mob.control = mob_control(alpha = alpha, bonferroni = bonferroni, minsplit = minsplit, trim = trim, objfun = objfun, breakties = breakties, parm = parm, verbose = verbose)
+#   class(mob.control) <- "list"
+#   rval <- new("mobTreeControl", mob.control = mob.control)
+#   return(rval)
+# }
+
+setClass("mobForestControl", representation(ntree = "numeric", mtry = "numeric", replace = "logical", fraction="numeric", mob.control = "list"), prototype = list(ntree = 300, mtry = 0, replace = FALSE, fraction = 0.632))
+mobForest_control <- function(ntree = 300, mtry = 0, replace = FALSE, fraction = 0.632, alpha = 1, bonferroni = FALSE, minsplit = 20, trim = 0.1, objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE)
 {
-	mob.control = mob_control(alpha = alpha, bonferroni = bonferroni, minsplit = minsplit, trim = trim, objfun = objfun, breakties = breakties, parm = parm, verbose = verbose)
-	class(mob.control) <- "list"
-	rval <- new("mobForestControl", ntree = ntree, mtry = mtry, replace = replace, fraction = fraction, mob.control = mob.control)
-    return(rval)
+  mob.control = mob_control(alpha = alpha, bonferroni = bonferroni, minsplit = minsplit, trim = trim, objfun = objfun, breakties = breakties, parm = parm, verbose = verbose)
+  class(mob.control) <- "list"
+  rval <- new("mobForestControl", ntree = ntree, mtry = mtry, replace = replace, fraction = fraction, mob.control = mob.control)
+  return(rval)
 }
 
 setClass("predictionOutput", representation(predMat = "matrix", R2 = "numeric", mse = "numeric", overallR2 = "numeric", predType = "character"), prototype = list(predMat = matrix(0,0,0), R2 = numeric(), mse = numeric(), overallR2 = numeric(), predType = character()))
@@ -63,7 +72,7 @@ setMethod("varimplot", signature(object="mobForestOutput"), function(object) {
 	varImp.scores <- apply((rf@VarimpObject)@varimpMatrix, 1, mean, na.rm=T)	
 	par(mfrow = c(1,2))
 	#boxplot(t(rf@VarimpObject@varimpMatrix))
-	lattice::dotplot(sort(varImp.scores),xlab="Variable Importance in data\n(predictors to right of dashed vertical line are significant)",
+	lattice::dotplot(sort(varImp.scores),xlab="Variable Importance in the data",
         panel = function(x,y){
            panel.dotplot(x,y,col='darkblue', pch=16, cex=1.1, main="Variance Importance Plot")
            panel.abline(v=abs(min(varImp.scores)), col='red',
@@ -96,15 +105,21 @@ setMethod("getPredictedValues", signature(object="mobForestOutput", OOB="ANY", n
 
 setGeneric("residualPlot", function(object) standardGeneric("residualPlot"))
 setMethod("residualPlot", signature(object="mobForestOutput"), function(object) {
-	
+  	
 	rf <- object
-	par(mfrow = c(2,1))
-	plot(rf@oobPredictions@predMat[,1], rf@oobPredictions@predMat[,3], xlab="Out-of-bag predcitions", ylab="Out-of-bag residuals")
-	hist(rf@oobPredictions@predMat[,3], main="Out-of-bag residuals histogram", xlab="Out-of-bag residuals", breaks=50)
+  if(rf@fam == "binomial" | rf@fam == "poisson")
+  {
+    cat("Residual Plot not produced when logistic of Poisson regression is considered as the node model\n")
+    #return;
+  } else {
+		par(mfrow = c(2,1))
+	  plot(rf@oobPredictions@predMat[,1], rf@oobPredictions@predMat[,3], xlab="Out-of-bag predcitions", ylab="Out-of-bag residuals")
+	  hist(rf@oobPredictions@predMat[,3], main="Out-of-bag residuals histogram", xlab="Out-of-bag residuals", breaks=50)
+  }  
 })
 
-setGeneric("PredictiveAccuracy", function(object, newdata = FALSE, plot = TRUE) standardGeneric("PredictiveAccuracy"))
-setMethod("PredictiveAccuracy", signature(object="mobForestOutput", newdata="ANY", plot="ANY"), function(object, newdata, plot) {
+setGeneric("PredictiveAccuracy", function(object, newdata = FALSE, prob.cutoff = NULL, plot = TRUE) standardGeneric("PredictiveAccuracy"))
+setMethod("PredictiveAccuracy", signature(object="mobForestOutput", newdata="ANY", prob.cutoff="ANY", plot="ANY"), function(object, newdata, prob.cutoff, plot) {
 	
 	rf <- object
 	rval <- list()
@@ -113,15 +128,15 @@ setMethod("PredictiveAccuracy", signature(object="mobForestOutput", newdata="ANY
 	if(newdata == FALSE)
 	{		
 		ss = nrow((rf@GeneralPredictions)@predMat)
-		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss, rf@modelUsed, rf@fam)
-		names(rval) <- c("oob.R2", "oob.mse", "oob.OverallR2", "oob.OverallMSE", "General.R2", "General.mse", "General.OverallR2", "General.OverallMSE", "modelUsed", "fam")
+		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss, rf@modelUsed, rf@fam, prob.cutoff)
+		names(rval) <- c("oob.R2", "oob.mse", "oob.OverallR2", "oob.OverallMSE", "General.R2", "General.mse", "General.OverallR2", "General.OverallMSE", "modelUsed", "fam", "prob.cutoff")
 		vecR2 = c(rval$oob.OverallR2, min(rval$oob.R2), max(rval$oob.R2))
 		vecMSE = c(rval$oob.OverallMSE, min(rval$oob.mse), max(rval$oob.mse))
 	} else {		
 		ss1 = nrow((rf@GeneralPredictions)@predMat)
 		ss2 = nrow((rf@NewDataPredictions)@predMat)
-		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss1, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss1, rf@modelUsed, rf@fam, (rf@NewDataPredictions)@R2, (rf@NewDataPredictions)@overallR2, sum((rf@NewDataPredictions)@predMat[,3]**2, na.rm=T)/ss2)
-		names(rval) <- c("oob.R2", "oob.mse", "oob.OverallR2", "oob.OverallMSE", "General.R2", "General.mse", "General.OverallR2", "General.OverallMSE", "modelUsed", "fam", "Newdata.R2", "Newdata.OverallR2", "Newdata.OverallMSE")
+		rval <- list((rf@oobPredictions)@R2, (rf@oobPredictions)@mse, (rf@oobPredictions)@overallR2, sum((rf@oobPredictions)@predMat[,3]**2, na.rm=T)/ss1, (rf@GeneralPredictions)@R2, (rf@GeneralPredictions)@mse, (rf@GeneralPredictions)@overallR2, sum((rf@GeneralPredictions)@predMat[,3]**2, na.rm=T)/ss1, rf@modelUsed, rf@fam, (rf@NewDataPredictions)@R2, (rf@NewDataPredictions)@overallR2, sum((rf@NewDataPredictions)@predMat[,3]**2, na.rm=T)/ss2, prob.cutoff)
+		names(rval) <- c("oob.R2", "oob.mse", "oob.OverallR2", "oob.OverallMSE", "General.R2", "General.mse", "General.OverallR2", "General.OverallMSE", "modelUsed", "fam", "Newdata.R2", "Newdata.OverallR2", "Newdata.OverallMSE", "prob.cutoff")
 		vecR2 = c(rval$oob.OverallR2, min(rval$oob.R2), max(rval$oob.R2), rval$Newdata.OverallR2)
 		vecMSE = c(rval$oob.OverallMSE, min(rval$oob.mse), max(rval$oob.mse), rval$Newdata.OverallMSE)
 	}
@@ -224,13 +239,13 @@ print.predAccuracyEstimates <- function(x,...)
 	if(pred.accuracy$fam == "binomial")
 	{		
 		cat("OOB (Training) Data: \n\n")
-		logistic_accuracy(pacc$train.response, pacc$oobPredMean)	
+		logistic_accuracy(pacc$train.response, pacc$oobPredMean, pacc$prob.cutoff)	
 		cat("All (Training) Data: \n\n")
-		logistic_accuracy(pacc$train.response, pacc$genPredMean)
+		logistic_accuracy(pacc$train.response, pacc$genPredMean, pacc$prob.cutoff)
 		if(!is.null(pacc$Newdata.OverallR2))
 		{
 			cat("Validation Data: \n\n")
-			logistic_accuracy(pacc$new.response, pacc$newPredMean)
+			logistic_accuracy(pacc$new.response, pacc$newPredMean, pacc$prob.cutoff)
 		}		
 	} else {
 		cat("Data Used\tPseudo R2\tMSE\n") 
@@ -246,10 +261,11 @@ print.predAccuracyEstimates <- function(x,...)
 	}
 }
 
-logistic_accuracy <- function(response, predicted)
+logistic_accuracy <- function(response, predicted, prob.thresh)
 {
-	PredClass = rep(levels(response[,1])[1], length(predicted))
-	PredClass[which(predicted > 0.5)] = levels(response[,1])[2]
+	if(is.null(prob.thresh)) prob.thresh = 0.5
+  PredClass = rep(levels(response[,1])[1], length(predicted))
+	PredClass[which(predicted > prob.thresh)] = levels(response[,1])[2]
 	Tab = table(Data_Class = response[,1], Predicted_Class = PredClass)
 	#rownames(Tab) = c(paste("True", levels(response[,1])[1]), paste("True", levels(response[,1])[2]))
 	#colnames(Tab) = c(paste("Predicted", levels(predicted)[1]), paste("Predicted", levels(predicted)[2]))

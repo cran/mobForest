@@ -8,8 +8,8 @@ Control parameters for random forest
 Various parameters that control the forest growing.
 }
 \usage{
-mobForest_control(ntree = 300, mtry = 0, replace = TRUE, fraction = 0.632, 
-alpha = 0.05, bonferroni = TRUE, minsplit = 20, trim = 0.1, objfun = deviance, 
+mobForest_control(ntree = 300, mtry = 0, replace = FALSE, fraction = 0.632, 
+alpha = 1, bonferroni = FALSE, minsplit = 20, trim = 0.1, objfun = deviance, 
 breakties = FALSE, parm = NULL, verbose = FALSE)
 }
 %- maybe also 'usage' for other objects documented here.

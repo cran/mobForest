@@ -1,8 +1,8 @@
 Package: mobForest
 Type: Package
 Title: Model based Random Forest analysis
-Version: 1.1
-Date: 2011-12-12
+Version: 1.2
+Date: 2013-01-28
 Author: Nikhil Garge, Barry Eggleston and Georgiy Bobashev
 Maintainer: Nikhil Garge <ngarge@rti.org>
 Description: This package implements random forest method for model
@@ -19,6 +19,6 @@ LazyLoad: yes
 Depends: parallel, party, lattice
 Imports: methods, modeltools
 Suggests: mlbench
-Packaged: 2012-11-03 17:47:36 UTC; ngarge
+Packaged: 2013-01-28 21:36:14 UTC; ngarge
 Repository: CRAN
-Date/Publication: 2012-11-03 20:06:35
+Date/Publication: 2013-01-29 23:13:15
