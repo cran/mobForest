@@ -99,7 +99,7 @@ mobforest.analysis <-
   function(formula, partition_vars, data,
            mobforest_controls = mobforest.control(),
            new_test_data = as.data.frame(matrix(0, 0, 0)), processors = 1,
-           model = linearModel, family = NULL, prob_cutoff = NULL,
+           model = linearModel, family = NULL, prob_cutoff = .5,
            seed = sample(1:10000000, 1)) {
     # From library(party)
     mod <- string.formula(formula)
@@ -116,6 +116,7 @@ mobforest.analysis <-
     cl <- makeCluster(getOption("cl.cores", processors))
     clusterEvalQ(cl, {
       library(party)
+      library(mobForest)
       })
     clusterSetRNGStream(cl, iseed = seed)
     clusterExport(cl, c("mob.rf.tree", "tree.predictions", "compute.r2",
@@ -124,9 +125,9 @@ mobforest.analysis <-
       clusterApply(cl, 1:B, bootstrap, data = data, main_model = mod,
                    partition_vars = partition_vars, mtry = mtry,
                    new_test_data = new_test_data,
-                   mobforest_control = mobforest_controls@mob_control,
-                   fraction = fraction, replace = mobforest_controls@replace,
-                   model = model, family = family, prob_cutoff = prob_cutoff)
+                   mobforest_controls = mobforest_controls,
+                   fraction = fraction, model = model, family = family,
+                   prob_cutoff = prob_cutoff)
     stopCluster(cl)
     obs.outcome <-
       ModelEnvFormula(as.formula(paste(mod, partition_vars, sep = " | ")),
@@ -139,7 +140,7 @@ mobforest.analysis <-
           get.mf.object.glm(c_out, main_model = mod,
                         partition_vars = partition_vars, data = data,
                         new_test_data = new_test_data, ntree = B,
-                        fam = family$family, prob_cutoff = prob_cutoff)
+                        family = family, prob_cutoff = prob_cutoff)
       }
     }
     if (model@name == "linear regression model") {
@@ -147,7 +148,7 @@ mobforest.analysis <-
         get.mf.object.lm(c_out, main_model = mod,
                               partition_vars = partition_vars, data = data,
                               new_test_data = new_test_data, ntree = B,
-                              fam = "")
+                              family = family)
     }
     return(mf_object)
   }
